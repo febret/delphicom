@@ -1,0 +1,32 @@
+{
+ "4": {
+  "class_type": "FL_ChatterboxTurboTTS",
+  "inputs": {
+   "text": "You'll never catch me now. [laugh]",
+   "temperature": 0.8,
+   "top_k": 1000,
+   "top_p": 0.95,
+   "repetition_penalty": 1.2,
+   "seed": 0,
+   "use_cpu": false,
+   "keep_model_loaded": true
+  },
+  "_meta": {
+   "title": "Chatterbox Turbo TTS (paralinguistic tags)"
+  }
+ },
+ "5": {
+  "class_type": "SaveAudioAdvanced",
+  "inputs": {
+   "audio": [
+    "4",
+    0
+   ],
+   "filename_prefix": "speech/ComfyUI",
+   "format": "flac"
+  },
+  "_meta": {
+   "title": "Save Audio (FLAC)"
+  }
+ }
+}

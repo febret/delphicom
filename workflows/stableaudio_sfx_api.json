@@ -1,0 +1,132 @@
+{
+ "4": {
+  "class_type": "CheckpointLoaderSimple",
+  "inputs": {
+   "ckpt_name": "stable-audio-open-1.0.safetensors"
+  },
+  "_meta": {
+   "title": "Load Checkpoint (Stable Audio Open 1.0)"
+  }
+ },
+ "10": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "t5-base.safetensors",
+   "type": "stable_audio",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Load CLIP (t5-base)"
+  }
+ },
+ "6": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "cat meowing, close-up, foley sound effect",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Prompt"
+  }
+ },
+ "7": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Negative Prompt"
+  }
+ },
+ "11": {
+  "class_type": "EmptyLatentAudio",
+  "inputs": {
+   "seconds": 8.0,
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "Duration"
+  }
+ },
+ "3": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "seed": 0,
+   "steps": 50,
+   "cfg": 4.98,
+   "sampler_name": "dpmpp_3m_sde_gpu",
+   "scheduler": "exponential",
+   "positive": [
+    "6",
+    0
+   ],
+   "negative": [
+    "7",
+    0
+   ],
+   "latent_image": [
+    "11",
+    0
+   ],
+   "denoise": 1
+  },
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "12": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "3",
+    0
+   ],
+   "vae": [
+    "4",
+    2
+   ]
+  },
+  "_meta": {
+   "title": "VAEDecodeAudio"
+  }
+ },
+ "21": {
+  "class_type": "TrimAudioDuration",
+  "inputs": {
+   "audio": [
+    "12",
+    0
+   ],
+   "start_index": 0,
+   "duration": 8.0
+  },
+  "_meta": {
+   "title": "Trim to Duration"
+  }
+ },
+ "20": {
+  "class_type": "SaveAudioAdvanced",
+  "inputs": {
+   "audio": [
+    "21",
+    0
+   ],
+   "filename_prefix": "sfx/ComfyUI",
+   "format": "flac"
+  },
+  "_meta": {
+   "title": "Save Audio (FLAC)"
+  }
+ }
+}

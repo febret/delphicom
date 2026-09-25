@@ -1,0 +1,150 @@
+{
+ "4": {
+  "class_type": "CheckpointLoaderSimple",
+  "inputs": {
+   "ckpt_name": "stable_audio_3_small_sfx_base.safetensors"
+  },
+  "_meta": {
+   "title": "Load Checkpoint (Stable Audio 3 Small-SFX)"
+  }
+ },
+ "10": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "t5gemma_b_b_ul2.safetensors",
+   "type": "stable_audio",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Load CLIP (t5gemma)"
+  }
+ },
+ "6": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "heavy rain hitting a window, close-up, foley sound effect",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Prompt"
+  }
+ },
+ "7": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Negative Prompt"
+  }
+ },
+ "8": {
+  "class_type": "ConditioningStableAudio",
+  "inputs": {
+   "positive": [
+    "6",
+    0
+   ],
+   "negative": [
+    "7",
+    0
+   ],
+   "seconds_start": 0.0,
+   "seconds_total": 8.0
+  },
+  "_meta": {
+   "title": "Stable Audio Duration Conditioning"
+  }
+ },
+ "11": {
+  "class_type": "EmptyLatentAudio",
+  "inputs": {
+   "seconds": 8.0,
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "Duration"
+  }
+ },
+ "3": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "seed": 0,
+   "steps": 8,
+   "cfg": 3.0,
+   "sampler_name": "lcm",
+   "scheduler": "simple",
+   "positive": [
+    "8",
+    0
+   ],
+   "negative": [
+    "8",
+    1
+   ],
+   "latent_image": [
+    "11",
+    0
+   ],
+   "denoise": 1
+  },
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "12": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "3",
+    0
+   ],
+   "vae": [
+    "4",
+    2
+   ]
+  },
+  "_meta": {
+   "title": "VAEDecodeAudio"
+  }
+ },
+ "21": {
+  "class_type": "TrimAudioDuration",
+  "inputs": {
+   "audio": [
+    "12",
+    0
+   ],
+   "start_index": 0,
+   "duration": 8.0
+  },
+  "_meta": {
+   "title": "Trim to Duration"
+  }
+ },
+ "20": {
+  "class_type": "SaveAudioAdvanced",
+  "inputs": {
+   "audio": [
+    "21",
+    0
+   ],
+   "filename_prefix": "sfx/ComfyUI",
+   "format": "flac"
+  },
+  "_meta": {
+   "title": "Save Audio (FLAC)"
+  }
+ }
+}

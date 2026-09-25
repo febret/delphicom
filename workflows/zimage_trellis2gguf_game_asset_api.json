@@ -1,0 +1,503 @@
+{
+ "119": {
+  "class_type": "Trellis2PreProcessImage_GGUF",
+  "inputs": {
+   "image": [
+    "414",
+    0
+   ],
+   "padding": 25,
+   "remove_background": false
+  },
+  "_meta": {
+   "title": "Trellis2PreProcessImage_GGUF"
+  }
+ },
+ "10": {
+  "class_type": "Preview3D",
+  "inputs": {
+   "model_file": [
+    "165",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Preview3D"
+  }
+ },
+ "45": {
+  "class_type": "Trellis2MeshWithVoxelAdvancedGenerator_GGUF",
+  "inputs": {
+   "pipeline": [
+    "170",
+    0
+   ],
+   "image": [
+    "119",
+    0
+   ],
+   "seed": 123456,
+   "pipeline_type": "512",
+   "sparse_structure_steps": 4,
+   "sparse_structure_guidance_strength": 6.5,
+   "sparse_structure_guidance_rescale": 0.2,
+   "sparse_structure_rescale_t": 4,
+   "shape_steps": 4,
+   "shape_guidance_strength": 6.5,
+   "shape_guidance_rescale": 0.2,
+   "shape_rescale_t": 4,
+   "texture_steps": 4,
+   "texture_guidance_strength": 3.0,
+   "texture_guidance_rescale": 0.2,
+   "texture_rescale_t": 3.0,
+   "max_num_tokens": 49152,
+   "max_views": 2,
+   "sparse_structure_resolution": 16,
+   "generate_texture_slat": false,
+   "sparse_structure_guidance_interval_start": 0.1,
+   "sparse_structure_guidance_interval_end": 1.0,
+   "shape_guidance_interval_start": 0.1,
+   "shape_guidance_interval_end": 1.0,
+   "texture_guidance_interval_start": 0.0,
+   "texture_guidance_interval_end": 0.9,
+   "use_tiled_decoder": true,
+   "sparse_structure_sampler": "euler",
+   "shape_sampler": "euler",
+   "texture_sampler": "euler"
+  },
+  "_meta": {
+   "title": "Trellis2MeshWithVoxelAdvancedGenerator_GGUF"
+  }
+ },
+ "19": {
+  "class_type": "Trellis2ExportMesh_GGUF",
+  "inputs": {
+   "trimesh": [
+    "162",
+    0
+   ],
+   "filename_prefix": [
+    "167",
+    0
+   ],
+   "file_format": "obj"
+  },
+  "_meta": {
+   "title": "Trellis2ExportMesh_GGUF"
+  }
+ },
+ "159": {
+  "class_type": "Trellis2Remesh_GGUF",
+  "inputs": {
+   "mesh": [
+    "45",
+    0
+   ],
+   "remesh_band": 1.0,
+   "remesh_project": 0.0,
+   "dual_contouring_resolution": "256",
+   "remove_floaters": true,
+   "remove_inner_faces": false
+  },
+  "_meta": {
+   "title": "Trellis2Remesh_GGUF"
+  }
+ },
+ "160": {
+  "class_type": "Trellis2SimplifyMesh_GGUF",
+  "inputs": {
+   "mesh": [
+    "159",
+    0
+   ],
+   "target_face_num": [
+    "171",
+    0
+   ],
+   "method": "Cumesh"
+  },
+  "_meta": {
+   "title": "Trellis2SimplifyMesh_GGUF"
+  }
+ },
+ "161": {
+  "class_type": "Trellis2FillHolesWithMeshlib_GGUF",
+  "inputs": {
+   "mesh": [
+    "160",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Trellis2FillHolesWithMeshlib_GGUF"
+  }
+ },
+ "162": {
+  "class_type": "Trellis2MeshWithVoxelToTrimesh_GGUF",
+  "inputs": {
+   "mesh": [
+    "161",
+    0
+   ],
+   "reorient_vertices": "90 degrees",
+   "rotate_x": 0,
+   "rotate_y": 0,
+   "rotate_z": 0
+  },
+  "_meta": {
+   "title": "Trellis2MeshWithVoxelToTrimesh_GGUF"
+  }
+ },
+ "163": {
+  "class_type": "Trellis2MeshTexturing_GGUF",
+  "inputs": {
+   "pipeline": [
+    "170",
+    0
+   ],
+   "image": [
+    "119",
+    0
+   ],
+   "trimesh": [
+    "164",
+    0
+   ],
+   "seed": 123456,
+   "texture_steps": 12,
+   "texture_guidance_strength": 3.0,
+   "texture_guidance_rescale": 0.2,
+   "texture_rescale_t": 3.0,
+   "resolution": "512",
+   "texture_size": 512,
+   "texture_alpha_mode": "OPAQUE",
+   "double_side_material": false,
+   "texture_guidance_interval_start": 0.0,
+   "texture_guidance_interval_end": 0.9,
+   "max_views": 4,
+   "bake_on_vertices": false,
+   "use_custom_normals": false,
+   "uv_unwrap_method": "Xatlas",
+   "mesh_cluster_threshold_cone_half_angle_rad": 60.0,
+   "use_tiled_encoder": false,
+   "encoder_tile_size": 512,
+   "encoder_overlap": 24,
+   "use_tiled_decoder_for_texture": false,
+   "decoder_tile_size": 120,
+   "decoder_overlap": 48,
+   "sampler": "euler"
+  },
+  "_meta": {
+   "title": "Trellis2MeshTexturing_GGUF"
+  }
+ },
+ "164": {
+  "class_type": "Trellis2Continue_GGUF",
+  "inputs": {
+   "input_1": [
+    "162",
+    0
+   ],
+   "input_2": [
+    "19",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Trellis2Continue_GGUF"
+  }
+ },
+ "165": {
+  "class_type": "Trellis2ExportMesh_GGUF",
+  "inputs": {
+   "trimesh": [
+    "172",
+    0
+   ],
+   "filename_prefix": [
+    "168",
+    0
+   ],
+   "file_format": "glb"
+  },
+  "_meta": {
+   "title": "Trellis2ExportMesh_GGUF"
+  }
+ },
+ "166": {
+  "class_type": "PrimitiveString",
+  "inputs": {
+   "value": "GameAsset"
+  },
+  "_meta": {
+   "title": "Name"
+  }
+ },
+ "167": {
+  "class_type": "StringConcatenate",
+  "inputs": {
+   "string_a": [
+    "166",
+    0
+   ],
+   "string_b": "_WhiteMesh",
+   "delimiter": ""
+  },
+  "_meta": {
+   "title": "StringConcatenate"
+  }
+ },
+ "168": {
+  "class_type": "StringConcatenate",
+  "inputs": {
+   "string_a": [
+    "166",
+    0
+   ],
+   "string_b": "_Textured",
+   "delimiter": ""
+  },
+  "_meta": {
+   "title": "StringConcatenate"
+  }
+ },
+ "170": {
+  "class_type": "Trellis2LoadModel_GGUF",
+  "inputs": {
+   "modelname": "TRELLIS.2-4B",
+   "model_format": "GGUF Q8_0",
+   "backend": "sdpa",
+   "device": "cuda",
+   "low_vram": true,
+   "keep_models_loaded": true
+  },
+  "_meta": {
+   "title": "Trellis2LoadModel_GGUF"
+  }
+ },
+ "171": {
+  "class_type": "PrimitiveInt",
+  "inputs": {
+   "value": 5000
+  },
+  "_meta": {
+   "title": "Target Face Number"
+  }
+ },
+ "172": {
+  "class_type": "Trellis2SmoothNormals_GGUF",
+  "inputs": {
+   "trimesh": [
+    "163",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Trellis2SmoothNormals_GGUF"
+  }
+ },
+ "401": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "z_image_turbo_bf16.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "UNETLoader"
+  }
+ },
+ "402": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_3_4b.safetensors",
+   "type": "lumina2",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "CLIPLoader"
+  }
+ },
+ "403": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "ae.safetensors"
+  },
+  "_meta": {
+   "title": "VAELoader"
+  }
+ },
+ "404": {
+  "class_type": "ModelSamplingAuraFlow",
+  "inputs": {
+   "model": [
+    "401",
+    0
+   ],
+   "shift": 3,
+   "sampling": "flow"
+  },
+  "_meta": {
+   "title": "ModelSamplingAuraFlow"
+  }
+ },
+ "405": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "low poly game model of a treasure chest, 16 color palette, vibrant colors, isometric view, neutral background, game asset",
+   "clip": [
+    "402",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "CLIPTextEncode"
+  }
+ },
+ "406": {
+  "class_type": "ConditioningZeroOut",
+  "inputs": {
+   "conditioning": [
+    "405",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "ConditioningZeroOut"
+  }
+ },
+ "407": {
+  "class_type": "EmptySD3LatentImage",
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "EmptySD3LatentImage"
+  }
+ },
+ "408": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "404",
+    0
+   ],
+   "seed": 0,
+   "steps": 6,
+   "cfg": 1,
+   "sampler_name": "res_multistep",
+   "scheduler": "simple",
+   "positive": [
+    "405",
+    0
+   ],
+   "negative": [
+    "406",
+    0
+   ],
+   "latent_image": [
+    "407",
+    0
+   ],
+   "denoise": 1
+  },
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "409": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "408",
+    0
+   ],
+   "vae": [
+    "403",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "VAEDecode"
+  }
+ },
+ "410": {
+  "class_type": "PreviewImage",
+  "inputs": {
+   "images": [
+    "409",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "PreviewImage"
+  }
+ },
+ "411": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "409",
+    0
+   ],
+   "filename_prefix": "zimage_game_asset"
+  },
+  "_meta": {
+   "title": "SaveImage"
+  }
+ },
+ "412": {
+  "class_type": "LoadBackgroundRemovalModel",
+  "inputs": {
+   "bg_removal_name": "birefnet.safetensors"
+  },
+  "_meta": {
+   "title": "LoadBackgroundRemovalModel"
+  }
+ },
+ "413": {
+  "class_type": "RemoveBackground",
+  "inputs": {
+   "bg_removal_model": [
+    "412",
+    0
+   ],
+   "image": [
+    "409",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "RemoveBackground"
+  }
+ },
+ "414": {
+  "class_type": "JoinImageWithAlpha",
+  "inputs": {
+   "image": [
+    "409",
+    0
+   ],
+   "alpha": [
+    "415",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "JoinImageWithAlpha"
+  }
+ },
+ "415": {
+  "class_type": "InvertMask",
+  "inputs": {
+   "mask": [
+    "413",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "InvertMask"
+  }
+ }
+}

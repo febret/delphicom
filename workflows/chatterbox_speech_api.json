@@ -1,0 +1,31 @@
+{
+ "4": {
+  "class_type": "FL_ChatterboxTTS",
+  "inputs": {
+   "text": "The gate is locked. Find another way around.",
+   "exaggeration": 0.5,
+   "cfg_weight": 0.5,
+   "temperature": 0.8,
+   "seed": 0,
+   "use_cpu": false,
+   "keep_model_loaded": true
+  },
+  "_meta": {
+   "title": "Chatterbox TTS (prosody)"
+  }
+ },
+ "5": {
+  "class_type": "SaveAudioAdvanced",
+  "inputs": {
+   "audio": [
+    "4",
+    0
+   ],
+   "filename_prefix": "speech/ComfyUI",
+   "format": "flac"
+  },
+  "_meta": {
+   "title": "Save Audio (FLAC)"
+  }
+ }
+}
