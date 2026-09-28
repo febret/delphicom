@@ -61,40 +61,108 @@ assets/chest.glb           textured low-poly 3D model
 assets/render_chest.png    optional Blender render
 ```
 
-Options: `--outdir`, `--host`, `--workflow`, `--seed`, `--timeout`, `--render`,
-`--blender`. Use `BLENDER=/path/to/blender` or `--blender` if Blender is not on
-`PATH`.
+Options: `--outdir`, `--host`, `--workflow`, `--seed`, `--faces`, `--timeout`,
+`--serve`, `--render`, `--blender`. Use `BLENDER=/path/to/blender` or `--blender`
+if Blender is not on `PATH`.
+
+`--faces N` (alias `--vertices N`) sets the mesh simplification target — the
+output poly/vertex budget (default 5000, the workflow's Target Face Number).
+
+With `--serve` the workflow is **loaded, not run**: the UI workflow
+(`workflows/zimage_trellis2gguf_game_asset.json`, derived from `--workflow`) is
+filled in with the same prompt/style/name/seed and uploaded to the remote
+ComfyUI's userdata, so it appears in the web UI's workflow menu. Open
+`http://delphi:8188`, load the named workflow, edit it, and run it there. Nothing
+is queued and no local files are written:
+
+```bash
+python generate_asset.py "a rusty medieval lantern" --name lantern --serve
+```
+
+### Sound effects (`generate_sound.py`)
+
+Generate sound effects / short audio samples from a text prompt:
+
+| `--model` | Model | Notes |
+|-----------|-------|-------|
+| `sao` (default) | Stable Audio Open 1.0 | best all-round foley/SFX; band-limited to ~16 kHz |
+| `sa3` | Stable Audio 3 Small-SFX | smaller/faster SFX specialist; can be quiet/dull on diffuse sounds |
+
+```bash
+python generate_sound.py "kitty meowing, close-up, foley sound effect" --name cat_meow --duration 5 --wav
+python generate_sound.py "rain hitting a window" --model sa3 --duration 12
+python generate_sound.py "ui click, single" --duration 0.2   # sub-1s (generated at 1s, then trimmed)
+```
+
+Output (in `sounds/` by default): `sounds/<name>.flac` (+ `<name>.wav` with
+`--wav`). Options: `--model`, `--duration` (sub-second supported), `--seed`,
+`--steps`, `--cfg`, `--sampler`, `--scheduler`, `--negative`, `--style`,
+`--batch`, `--wav`, `--set NODE.FIELD=VALUE` (override any workflow input),
+`--list-models`. The negative prompt is empty by default: Stable Audio Open is
+trained on literal descriptions, so keep prompts short and concrete.
+
+### Speech / TTS (`generate_speech.py`)
+
+Generate spoken dialogue with prosody control:
+
+| `--model` | Model | Notes |
+|-----------|-------|-------|
+| `chatterbox` (default) | Chatterbox | `--exaggeration` (0.25-2.0) emotion/prosody dial; higher quality |
+| `chatterbox-turbo` | Chatterbox Turbo | faster; inline emotion tags `[laugh] [sigh] [gasp] ...`; quieter output |
+
+```bash
+python generate_speech.py "The gate is locked. Find another way around." --name guard --exaggeration 0.5
+python generate_speech.py "Watch out! Behind you!" --exaggeration 1.0 --name warn
+python generate_speech.py "You'll never catch me now. [laugh]" --model chatterbox-turbo
+python generate_speech.py "Welcome, traveller." --voice narrator.wav   # voice cloning
+```
+
+Output (in `speech/` by default): `speech/<name>.flac` (+ `.wav` with `--wav`).
+Options: `--model`, `--exaggeration`, `--cfg-weight` (pace), `--temperature`,
+`--top-k`, `--top-p`, `--repetition-penalty`, `--voice <file>`, `--seed`,
+`--wav`, `--set NODE.FIELD=VALUE`, `--list-models`. Prosody tips are in the
+tool's `--help`.
 
 ### Batch generation (`bake.py`)
 
-`bake.py` runs a JSON array of tasks in order, driving `generate_asset.py` or
-`generate_sound.py` for each and copying the final artifact to a target path:
+`bake.py` runs a JSON list of tasks in order, driving `generate_asset.py` or
+`generate_sound.py` for each and copying the final artifact to a target path.
+The file is either a bare task array or an object with named style prompts:
 
 ```json
-[
-  {"label": "chest", "tool": "asset",
-   "prompt": "low poly treasure chest, 16 color palette",
-   "output": "build/models/chest.glb", "args": {"render": true}},
-  {"label": "chest_open", "tool": "sound",
-   "prompt": "wooden chest lid creaking open, foley",
-   "output": "build/sfx/chest_open.flac", "args": {"duration": 3}}
-]
+{
+  "asset_styles": {"voxel": "voxel art. 16 color palette. vibrant."},
+  "sound_styles": {"foley": "close-up foley, dry recording"},
+  "tasks": [
+    {"label": "chest", "tool": "asset",
+     "prompt": "low poly treasure chest, 16 color palette",
+     "output": "build/models/chest.glb", "args": {"render": true}},
+    {"label": "chest_open", "tool": "sound",
+     "prompt": "wooden chest lid creaking open, foley",
+     "output": "build/sfx/chest_open.flac", "args": {"duration": 3}}
+  ]
+}
 ```
 
 ```bash
 python bake.py assets.json                       # run all (skips existing outputs)
 python bake.py assets.json --list                # show task indices/labels
+python bake.py assets.json --list-styles         # show named style prompts
 python bake.py assets.json --dry-run             # print the generator commands
 python bake.py assets.json --only 'chest*'       # re-run by label glob
 python bake.py assets.json --index 1,3-5 --force # re-run by index, overwrite
+python bake.py assets.json --style voxel --force # re-render all in one style
 ```
 
 Each task needs `tool`, `prompt` and `output`; `label` and `args` are optional.
 `output` ends in `.glb` for assets and `.flac`/`.wav` for sounds (`.wav` is
 transcoded and needs `soundfile` or `ffmpeg`). `args` values become CLI flags
-(`{"no_style": true}` -> `--no-style`). Existing outputs are skipped unless
-`--force` is given; failures stop the run unless `--keep-going`. See
-`bake-skill.md` for the full reference.
+(`{"no_style": true}` -> `--no-style`). `--style NAME` applies a named prompt
+from `asset_styles`/`sound_styles` to every selected task whose section defines
+it, overriding per-task styles. Existing outputs are skipped unless `--force` is
+given; failures stop the run unless `--keep-going`. See `bake-skill.md` for the
+full reference. Only the `asset` and `sound` tools are batched; run
+`generate_speech.py` directly for TTS.
 
 ### Configuration
 
@@ -112,10 +180,14 @@ COMFY_REMOTE_HOST=myhost COMFY_REMOTE_PORT=8188 COMFY_REMOTE_USER=me ./setup.sh
 COMFY_REMOTE_HOST=myhost COMFY_REMOTE_PORT=8188 python generate_asset.py "..." --name x
 ```
 
-To run inside ComfyUI's web UI instead, open `http://delphi:8188`, drag
-`workflows/zimage_trellis2gguf_game_asset.json` onto the canvas and edit the
-`CLIPTextEncode` prompt. (It is also copied to the server's user workflows dir by
-`setup.sh`, under `user/default/workflows/`.)
+To run inside ComfyUI's web UI instead, open `http://delphi:8188` and drag any
+UI workflow from `workflows/` onto the canvas — `zimage_trellis2gguf_game_asset.json`
+(3D), `stableaudio_sfx.json` / `stableaudio_sfx_sa3.json` (sound), or
+`chatterbox_speech.json` / `chatterbox_speech_turbo.json` (speech) — then edit
+the prompt node and run. Each pipeline also ships an `*_api.json` graph (same
+graph, API format) that the generators submit. For the 3D pipeline,
+`generate_asset.py --serve` automates the load step: it fills in the prompt and
+uploads the UI workflow into your ComfyUI workflow list instead of running it.
 
 ## Pipeline details
 
@@ -132,8 +204,19 @@ To run inside ComfyUI's web UI instead, open `http://delphi:8188`, drag
   `Trellis2ExportMesh_GGUF`.
 - **Default quality/speed settings** – model format `GGUF Q8_0`, texture
   resolution 512, `texture_steps=12`, `sparse_structure_resolution=16`,
-  simplify target 5000 faces, `low_vram=True`. Typical runtime 50-140 s per
-  asset on `delphi`.
+  simplify target 5000 faces (`--faces`), `low_vram=True`. Typical runtime 50-140
+  s per asset on `delphi`.
+- **Sound effects** – core ComfyUI audio nodes only (`CLIPLoader` type
+  `stable_audio`, `EmptyLatentAudio`, `KSampler`, `VAEDecodeAudio`,
+  `TrimAudioDuration`, `SaveAudioAdvanced`). Default `sao` = Stable Audio Open
+  1.0 (T5 text encoder); `sa3` = Stable Audio 3 Small-SFX base (T5Gemma
+  encoder, `lcm`/`simple` 8 steps). Output is 44.1 kHz stereo FLAC; clips under
+  1 s are generated at the 1 s latent minimum and trimmed.
+- **Speech (TTS)** – Chatterbox (Resemble AI) via the `ComfyUI_Fill-ChatterBox`
+  custom node pack (`FL_ChatterboxTTS` / `FL_ChatterboxTurboTTS`), installed and
+  model-prefetched by `setup.sh`. `exaggeration` is the prosody/emotion control;
+  the Turbo model adds inline tags (`[laugh]`, `[sigh]`, ...). Optional
+  zero-shot voice cloning from a short reference clip.
 
 ## Hardware / environment notes (AMD ROCm)
 
@@ -153,6 +236,12 @@ To run inside ComfyUI's web UI instead, open `http://delphi:8188`, drag
   context is created at the very top of `main.py` (see `setup.sh`) to avoid it.
 - `flash_attn`/`xformers` are not installed; the sparse attention path falls
   back to PyTorch SDPA automatically.
+- The audio pipelines need no extra system packages: sound uses core audio
+  nodes with the bundled PyAV codec, and speech uses the Chatterbox pack whose
+  Python deps (`librosa`, `s3tokenizer`, ...) `setup.sh` installs into the
+  bind-mounted venv. Model weights are pre-fetched under
+  `~/.local/share/ComfyUI/models/` (`checkpoints/`, `text_encoders/`,
+  `chatterbox/{chatterbox,chatterbox_turbo}`).
 
 ## Troubleshooting
 
@@ -162,3 +251,10 @@ To run inside ComfyUI's web UI instead, open `http://delphi:8188`, drag
 - Service: `ssh "${COMFY_REMOTE_USER:-febret}@${COMFY_REMOTE_HOST:-delphi}" "systemctl --user status comfyui@${COMFY_REMOTE_PORT:-8188}.service"`.
 - TRELLIS.2 GGUF weights download automatically on the first generation into
   `models/Trellis2/` (~4.5 GB for Q8_0).
+- Sound/speech models are downloaded by `./setup.sh` (~5.8 GB Stable Audio
+  Open 1.0 + ~3.5 GB Stable Audio 3 Small-SFX + ~5.6 GB Chatterbox standard and
+  Turbo). If a Chatterbox model is missing it auto-downloads from
+  `ResembleAI/chatterbox[-turbo]` on first use.
+- Chatterbox nodes missing from the API? Re-run `./setup.sh` (it clones the
+  pack and installs its deps in step **3b**) and check
+  `/object_info` for `FL_ChatterboxTTS`.

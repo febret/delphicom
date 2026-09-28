@@ -5,6 +5,19 @@ Reads a JSON file holding an array of tasks and, for each task, runs the
 matching generator (generate_asset.py or generate_sound.py) against the remote
 ComfyUI instance, then copies the produced artifact to the task's target path.
 
+The file is either a bare JSON array of tasks, or an object with optional
+named style prompts plus the task array:
+
+    {
+      "asset_styles": {"voxel": "voxel art. 16 color palette.", "...": "..."},
+      "sound_styles": {"retro": "chiptune, 8-bit", "...": "..."},
+      "tasks": [ ... ]
+    }
+
+`asset_styles` apply to asset tasks and `sound_styles` to sound tasks. Pick one
+name with --style NAME to override the style used by every selected task (it
+wins over any per-task "style" arg).
+
 Task object fields:
     label   optional  short name used for progress/selection (default: output stem)
     tool    required  "asset" (generate_asset.py) or "sound" (generate_sound.py)
@@ -14,20 +27,26 @@ Task object fields:
                       "render": true, "duration": 5, "wav": true}
 
 Example task file:
-    [
-      {"label": "chest", "tool": "asset",
-       "prompt": "low poly treasure chest, 16 color palette",
-       "output": "build/chest.glb", "args": {"render": true}},
-      {"label": "cat_meow", "tool": "sound",
-       "prompt": "kitty meowing, foley",
-       "output": "build/cat_meow.wav", "args": {"duration": 5}}
-    ]
+    {
+      "asset_styles": {"voxel": "voxel art. 16 color palette. vibrant."},
+      "sound_styles": {"retro": "chiptune, 8-bit", "foley": "close-up foley"},
+      "tasks": [
+        {"label": "chest", "tool": "asset",
+         "prompt": "low poly treasure chest, 16 color palette",
+         "output": "build/chest.glb", "args": {"render": true}},
+        {"label": "cat_meow", "tool": "sound",
+         "prompt": "kitty meowing, foley",
+         "output": "build/cat_meow.wav", "args": {"duration": 5}}
+      ]
+    }
 
 Examples:
     python bake.py tasks.json
     python bake.py tasks.json --only 'chest*' --only cat_meow
     python bake.py tasks.json --index 1,3-5 --keep-going
     python bake.py tasks.json --list
+    python bake.py tasks.json --list-styles
+    python bake.py tasks.json --style voxel --force
 """
 import argparse
 import fnmatch
@@ -60,6 +79,12 @@ ASSET_EXTS = (".glb",)
 SOUND_EXTS = (".flac", ".wav")
 RESERVED_ARGS = ("name", "outdir")
 
+# Which named-style section each generator draws from.
+STYLE_SECTIONS = {
+    "generate_asset.py": "asset_styles",
+    "generate_sound.py": "sound_styles",
+}
+
 _RANGE = re.compile(r"^(\d+)\s*-\s*(\d+)$")
 
 
@@ -68,14 +93,40 @@ def _resolve_tool(value):
     return GENERATORS.get(key)
 
 
+def _load_styles(raw, source):
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{source} must be a JSON object of name -> prompt")
+    styles = {}
+    for name, text in raw.items():
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"{source}[{name!r}] must be a non-empty string")
+        styles[str(name)] = text
+    return styles
+
+
 def load_tasks(path):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError("task file must contain a JSON array of tasks")
+
+    if isinstance(data, dict):
+        styles = {
+            "asset_styles": _load_styles(data.get("asset_styles"), "asset_styles"),
+            "sound_styles": _load_styles(data.get("sound_styles"), "sound_styles"),
+        }
+        raw_tasks = data.get("tasks")
+    elif isinstance(data, list):
+        styles = {"asset_styles": {}, "sound_styles": {}}
+        raw_tasks = data
+    else:
+        raise ValueError("task file must be a JSON array or object")
+
+    if not isinstance(raw_tasks, list):
+        raise ValueError("'tasks' must be a JSON array of tasks")
 
     tasks = []
-    for i, raw in enumerate(data, 1):
+    for i, raw in enumerate(raw_tasks, 1):
         if not isinstance(raw, dict):
             raise ValueError(f"task #{i} is not a JSON object")
 
@@ -114,7 +165,32 @@ def load_tasks(path):
             "output": output,
             "args": extra,
         })
-    return tasks
+    return styles, tasks
+
+
+def apply_style(tasks, selected, styles, name):
+    """Force the named style prompt onto every selected task that defines it.
+
+    The name is resolved in the section matching each task's tool (asset vs
+    sound). Tasks whose section does not define the name are left unchanged
+    (they keep their per-task style or generator default); the call only fails
+    if no selected task can use the name. Returns (applied, skipped) index lists.
+    """
+    applied, skipped = [], []
+    for i in selected:
+        task = tasks[i]
+        section = STYLE_SECTIONS.get(task["tool"], "asset_styles")
+        if name in styles[section]:
+            tasks[i]["args"]["style"] = styles[section][name]
+            applied.append(i)
+        else:
+            skipped.append((i, task, section))
+    if not applied:
+        available = {s: sorted(v) for s, v in styles.items()}
+        raise ValueError(
+            f"style {name!r} is not defined for any selected task "
+            f"(available: {available})")
+    return applied, skipped
 
 
 def parse_indices(specs, total):
@@ -250,6 +326,11 @@ def main():
                          "(repeatable)")
     ap.add_argument("--list", action="store_true",
                     help="list the tasks in the file and exit")
+    ap.add_argument("--list-styles", action="store_true",
+                    help="list the named style prompts in the file and exit")
+    ap.add_argument("--style", metavar="NAME",
+                    help="named style prompt (asset_styles/sound_styles) to apply "
+                         "to every selected task, overriding per-task styles")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the generator commands without running them")
     ap.add_argument("--force", action="store_true",
@@ -259,19 +340,28 @@ def main():
     args = ap.parse_args()
 
     try:
-        tasks = load_tasks(args.tasks)
+        styles, tasks = load_tasks(args.tasks)
     except (OSError, ValueError, json.JSONDecodeError) as e:
         print(f"bake: {e}", file=sys.stderr)
         return 2
 
     print(f"[bake] {args.tasks}: {len(tasks)} task(s)")
 
+    if args.list_styles:
+        for section in ("asset_styles", "sound_styles"):
+            names = sorted(styles[section])
+            print(f"[bake] {section}: {', '.join(names) if names else '(none)'}")
+        return 0
+
     if args.list:
         width = max((len(t["label"]) for t in tasks), default=5)
-        print(f"[bake] {'#':>3}  {'label':<{width}}  {'tool':<17}  output")
+        print(f"[bake] {'#':>3}  {'label':<{width}}  {'tool':<17}  "
+              f"{'style':<12}  output")
         for i, t in enumerate(tasks, 1):
+            style = t["args"].get("style", "")
+            style = "(own)" if style else "-"
             print(f"      {i:>3}  {t['label']:<{width}}  {t['tool']:<17}  "
-                  f"{t['output']}")
+                  f"{style:<12}  {t['output']}")
         return 0
 
     try:
@@ -283,6 +373,17 @@ def main():
     if not selected:
         print("[bake] no tasks matched the given selection", file=sys.stderr)
         return 2
+
+    if args.style:
+        try:
+            applied, skipped = apply_style(tasks, selected, styles, args.style)
+        except ValueError as e:
+            print(f"bake: {e}", file=sys.stderr)
+            return 2
+        print(f"[bake] applying style {args.style!r} to {len(applied)} task(s)")
+        for i, task, section in skipped:
+            print(f"    note: #{i + 1} {task['label']} has no "
+                  f"{section}[{args.style!r}], left unchanged")
     print(f"[bake] running {len(selected)}/{len(tasks)} task(s)")
 
     counts = {"ok": 0, "skipped": 0, "failed": 0, "dry-run": 0}

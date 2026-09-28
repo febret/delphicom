@@ -18,7 +18,9 @@ dialogue (TTS, FLAC)**. There is no local ML stack; everything executes on
 - Never use `GGUF Q4_K_M` for TRELLIS.2 (corrupt dequant -> noise textures).
   Use `Q8_0` / BF16.
 - Any change to a workflow must be reflected in **both** its UI and API JSONs,
-  and the node-id constants in the corresponding generator must stay in sync:
+  and the node-id constants in the corresponding generator must stay in sync
+  (for the 3D workflow also `UI_WIDGETS`, the `widgets_values` indices that
+  `generate_asset.py --serve` edits in the interactive graph):
   `workflows/zimage_trellis2gguf_game_asset{,_api}.json` <->
   `generate_asset.py`; `workflows/stableaudio_sfx{,_api}.json` and
   `workflows/stableaudio_sfx_sa3{,_api}.json` <-> `generate_sound.py`;
@@ -40,9 +42,11 @@ dialogue (TTS, FLAC)**. There is no local ML stack; everything executes on
 
 ```
 generate_asset.py     prompt -> assets/<name>_2d.png + assets/<name>.glb (+ --render)
+                      --serve: load the prompt-filled UI workflow into ComfyUI's
+                      userdata (workflows/) for interactive use; do not run it
 generate_sound.py     prompt -> sounds/<name>.flac (+ --wav via local soundfile/ffmpeg)
 generate_speech.py    text -> speech/<name>.flac (TTS; prosody + voice cloning)
-bake.py               batch runner: JSON task array -> many assets/sounds at target paths
+bake.py               batch runner: JSON task list -> many assets/sounds at target paths (+ named styles via --style)
 bake-skill.md         usage reference for bake.py (batch asset generation)
 setup.sh              idempotent provisioning of remote ComfyUI (software + models)
 render_glb.py         Blender headless GLB renderer
@@ -60,6 +64,8 @@ bash -n setup.sh                          # syntax check
 python -m py_compile generate_asset.py generate_sound.py generate_speech.py bake.py
 ./setup.sh                                # (re)provision remote; safe to re-run
 python generate_asset.py "<prompt>" --name x --render
+python generate_asset.py "<prompt>" --name x --faces 2000  # mesh simplify target (poly budget)
+python generate_asset.py "<prompt>" --name x --serve  # load UI workflow into ComfyUI; do not run
 python generate_sound.py "kitty meowing, foley" --name cat_meow --duration 5 --wav
 python generate_sound.py "rain on a window" --model sa3 --duration 12   # alternative model
 python generate_sound.py "ui click, single" --duration 0.2             # sub-1s (trimmed)
@@ -113,6 +119,7 @@ read these:
 `405` CLIPTextEncode (prompt) · `408` Z-Image KSampler (seed) ·
 `45` mesh generator (seed) · `163` texturing (seed) ·
 `166` PrimitiveString (export name) · `411` SaveImage (2D prefix) ·
+`171` PrimitiveInt (mesh simplify target face count; `--faces`/`--vertices`) ·
 `10` Preview3D (exposes the exported GLB filename).
 
 `stableaudio_sfx_api.json` / `stableaudio_sfx_sa3_api.json` (used by
