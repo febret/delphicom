@@ -3,7 +3,7 @@
 Game-asset generation toolkit that drives a **remote ComfyUI instance on the
 AMD `delphi` machine (ROCm)**. Three text-driven pipelines:
 
-- **3D assets** — text prompt → 2D concept image → textured low-poly model (GLB)
+- **3D assets** — text prompt (or an input image) → 2D concept image → textured low-poly model (GLB)
 - **Sound effects** — text prompt → sound-effect / short-audio sample (FLAC/WAV)
 - **Speech (TTS)** — text → spoken dialogue with prosody control (FLAC/WAV)
 
@@ -29,10 +29,12 @@ the tooling at a different host/user/port.
 
 | Path | Purpose |
 |------|---------|
-| `generate_asset.py` | Entry point: prompt -> `*_2d.png` + `*.glb` (downloads locally) |
+| `generate_asset.py` | Entry point: prompt (or `--image`) -> `*_2d.png` + `*.glb` (downloads locally) |
 | `generate_sound.py` | Entry point: prompt -> sound effect `*.flac` (+ optional `*.wav`) |
 | `generate_speech.py` | Entry point: text -> speech `*.flac` (prosody, voice cloning) |
 | `bake.py` | Batch runner: JSON task list -> many assets/sounds at target paths |
+| `mesh_simplify.py` | GLB analyzer and optional bake postprocessing driver |
+| `mesh_simplify_blender.py` | Headless Blender decimation and retopo/texture-rebake worker |
 | `bake-skill.md` | How to drive `bake.py` for batch asset generation |
 | `setup.sh` | First-time provisioning of the remote ComfyUI (software + models) |
 | `workflows/zimage_trellis2gguf_game_asset{,_api}.json` | 3D: UI + API workflow for `generate_asset.py` |
@@ -68,6 +70,17 @@ if Blender is not on `PATH`.
 `--faces N` (alias `--vertices N`) sets the mesh simplification target — the
 output poly/vertex budget (default 5000, the workflow's Target Face Number).
 
+With `--image PATH` the text-to-image phase is skipped: the image is uploaded to
+ComfyUI and fed directly into the TRELLIS.2 stage, through the same BiRefNet
+background-removal / alpha stage used for a generated image. The prompt becomes
+optional (it is ignored when both are given), and the input image is copied
+locally as the 2D reference:
+
+```bash
+python generate_asset.py --image concept.png --name chest --render
+python generate_asset.py --image fox.jpg --faces 3000
+```
+
 With `--serve` the workflow is **loaded, not run**: the UI workflow
 (`workflows/zimage_trellis2gguf_game_asset.json`, derived from `--workflow`) is
 filled in with the same prompt/style/name/seed and uploaded to the remote
@@ -78,6 +91,10 @@ is queued and no local files are written:
 ```bash
 python generate_asset.py "a rusty medieval lantern" --name lantern --serve
 ```
+
+With `--serve --image PATH` the loaded graph is instead wired to the uploaded
+image (the text-to-image nodes are muted), so the interactive workflow matches an
+`--image` run: `python generate_asset.py --image concept.png --serve`.
 
 ### Sound effects (`generate_sound.py`)
 
@@ -165,6 +182,24 @@ full reference. Only the `asset` and `sound` tools are batched; run
 `generate_speech.py` directly for TTS.
 
 ### Configuration
+
+**Optional mesh postprocessing:** put a `simplify` object beside `tasks` in a
+bake JSON document, or on an individual asset task. Task options override the
+document defaults; `simplify: false` disables the pass for a task.
+
+```json
+{"simplify": {"strategy": "auto", "target": 500, "flat_target": 100,
+              "wall_target": 200, "max_deviation": 0.05}, "tasks": []}
+```
+
+This runs local Blender on the generated GLB in staging before publishing it.
+It is separate from the remote generator's `args.faces` setting. `auto` uses
+UV-preserving decimation for rugs/paintings/mirrors and retopo plus albedo/normal
+rebaking for solids and walls. Use `strategy: "decimate"` for foliage.
+`--no-simplify` disables all configured postprocessing; `--simplify` enables
+defaults for asset tasks. See [bake-skill.md](bake-skill.md#optional-local-mesh-simplification)
+for resolution, deviation, Blender path, and model-specific options.
+
 
 The remote endpoint and ssh target are configurable through environment
 variables (a leading `--host` still overrides the server URL):

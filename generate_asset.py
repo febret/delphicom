@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Generate a 3D game asset from a text prompt.
+"""Generate a 3D game asset from a text prompt or an input image.
 
 Pipeline (runs on the remote ComfyUI instance, e.g. delphi:8188):
     Z-Image-Turbo text-to-image  ->  BiRefNet alpha  ->  TRELLIS.2 (GGUF Q8_0)
     image -> textured GLB (+ 2D reference image)
 
+With --image PATH the text-to-image phase is skipped: the given image is
+uploaded to ComfyUI and fed directly into the 3D stage, going through the same
+BiRefNet alpha stage as a generated image. The image is also copied locally as
+the 2D reference.
+
 Assets are exported locally as:
-    <outdir>/<name>_2d.png      the generated 2D reference image
+    <outdir>/<name>_2d.png      the generated (or supplied) 2D reference image
     <outdir>/<name>.glb         the textured 3D model
     <outdir>/render_<name>.png  (optional) Blender render, if --render
 
@@ -22,7 +27,9 @@ With --serve the workflow is *loaded, not run*: the UI workflow
 (workflows/zimage_trellis2gguf_game_asset.json, derived from --workflow) is
 filled in with the same prompt/name/seed and uploaded to the remote ComfyUI's
 userdata (workflows/), so it shows up in the web UI's workflow menu. Open
-http://<host>:<port>, load the named workflow, tweak it, and run it there.
+http://<host>:<port>, load the named workflow, tweak it, and run it there. With
+--serve --image the loaded graph is wired to the uploaded image instead of the
+text-to-image chain.
 
 Examples:
     python generate_asset.py "low poly game model of a treasure chest, ..." --name chest
@@ -30,17 +37,21 @@ Examples:
     python generate_asset.py "a knight's shield" --style "pixel art, 8-bit palette"
     python generate_asset.py "a low poly treasure chest" --faces 2000
     python generate_asset.py "a rusty medieval lantern" --name lantern --serve
+    python generate_asset.py --image concept.png --name chest
+    python generate_asset.py --image fox.jpg --faces 3000 --render
 """
 import argparse
 import json
 import os
 import random
 import re
+import shutil
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_API = os.path.join(HERE, "workflows", "zimage_trellis2gguf_game_asset_api.json")
@@ -60,6 +71,18 @@ NODE_SAVEIMG = "411"    # SaveImage: 2D reference
 NODE_PREVIEW3D = "10"   # Preview3D: exposes the exported GLB filename
 NODE_FACE_NUM = "171"   # PrimitiveInt: mesh simplification target (face count)
 NODE_SIMPLIFY = "160"   # Trellis2SimplifyMesh_GGUF (target_face_num widget)
+NODE_PREVIEW = "410"    # PreviewImage (2D preview)
+NODE_REMBG = "413"      # RemoveBackground (alpha from the source image)
+NODE_JOIN_ALPHA = "414" # JoinImageWithAlpha (image + matte -> TRELLIS.2 input)
+
+# Injected at runtime (not present in the workflow JSONs) when --image is used,
+# mirroring generate_speech.py's runtime LoadAudio node.
+NODE_LOADIMAGE = "416"  # LoadImage: the supplied input image
+
+# The Z-Image text-to-image chain plus its output nodes. Dropped (API) / muted
+# (UI) when --image is used so image generation is skipped.
+NODES_TEXT2IMG = ("401", "402", "403", "404", "405", "406", "407", "408",
+                  "409", "410", "411")
 
 # Widget positions (index into "widgets_values") inside the UI workflow
 # (workflows/zimage_trellis2gguf_game_asset.json) matching the API node inputs
@@ -106,6 +129,41 @@ def _download(base, filename, dst):
         f.write(r.read())
 
 
+def _upload(base, path):
+    """Upload an image into ComfyUI's input dir; return its stored name."""
+    filename = os.path.basename(path)
+    boundary = uuid.uuid4().hex
+    with open(path, "rb") as f:
+        data = f.read()
+    body = b"".join([
+        f'--{boundary}\r\nContent-Disposition: form-data; name="image"; '
+        f'filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode(),
+        data, b"\r\n",
+        f'--{boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\ninput\r\n'.encode(),
+        f"--{boundary}--\r\n".encode(),
+    ])
+    req = urllib.request.Request(
+        base + "/upload/image", data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        return json.load(r).get("name") or filename
+
+
+def _use_input_image(api, image_name):
+    """Rewire the API graph so a loaded image replaces the Z-Image output.
+
+    Drops the text-to-image chain and its output nodes, injects a LoadImage
+    node, and points the existing background-removal / alpha stage at it, so
+    the 3D step gets the same preprocessing as a generated image.
+    """
+    for nid in NODES_TEXT2IMG:
+        api.pop(nid, None)
+    api[NODE_LOADIMAGE] = {"class_type": "LoadImage",
+                           "inputs": {"image": image_name}}
+    api[NODE_REMBG]["inputs"]["image"] = [NODE_LOADIMAGE, 0]
+    api[NODE_JOIN_ALPHA]["inputs"]["image"] = [NODE_LOADIMAGE, 0]
+
+
 def _slug(text):
     s = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
     return (s[:40] or "asset")
@@ -144,6 +202,77 @@ def _apply_ui(ui, prompt_text, name, seed, faces=None):
         widgets[idx] = value
 
 
+def _remove_link(ui, link_id):
+    """Drop a link id from the UI graph's links list and any output slot."""
+    links = ui.setdefault("links", [])
+    links[:] = [l for l in links if l[0] != link_id]
+    for node in ui.get("nodes", []):
+        for out in node.get("outputs") or []:
+            slot_links = out.get("links")
+            if isinstance(slot_links, list) and link_id in slot_links:
+                slot_links.remove(link_id)
+
+
+def _wire_ui_image(ui, image_name):
+    """Inject a LoadImage node into the UI graph and route it into the 3D stage.
+
+    Rewires the background-removal / alpha / preview / save nodes to the input
+    image and mutes the text-to-image chain, mirroring _use_input_image.
+    """
+    nodes = {int(n["id"]): n for n in ui.get("nodes", [])}
+    links = ui.setdefault("links", [])
+    nid = int(NODE_LOADIMAGE)
+    next_link = max((l[0] for l in links), default=0) + 1
+
+    img_node = {
+        "id": nid,
+        "type": "LoadImage",
+        "pos": [-1150, 420],
+        "size": [315, 314],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+            {"name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": []},
+            {"name": "MASK", "type": "MASK", "links": None},
+        ],
+        "properties": {"cnr_id": "comfy-core", "Node name for S&R": "LoadImage"},
+        "widgets_values": [image_name, "image"],
+    }
+    ui["nodes"].append(img_node)
+    ui["last_node_id"] = max(int(ui.get("last_node_id", 0)), nid)
+
+    targets = ((NODE_REMBG, "image"), (NODE_JOIN_ALPHA, "image"),
+               (NODE_PREVIEW, "images"), (NODE_SAVEIMG, "images"))
+    for tid, iname in targets:
+        node = nodes.get(int(tid))
+        if node is None:
+            raise KeyError(tid)
+        slot = None
+        for i, inp in enumerate(node.get("inputs") or []):
+            if inp.get("name") == iname:
+                slot = i
+                old = inp.get("link")
+                if old is not None:
+                    _remove_link(ui, old)
+                inp["link"] = next_link
+                break
+        if slot is None:
+            raise KeyError(f"{tid}.{iname}")
+        img_node["outputs"][0]["links"].append(next_link)
+        links.append([next_link, nid, 0, int(tid), slot, "IMAGE"])
+        next_link += 1
+
+    for text_nid in NODES_TEXT2IMG:
+        if text_nid in (NODE_PREVIEW, NODE_SAVEIMG):
+            continue  # rewired to the input image above; keep them active
+        node = nodes.get(int(text_nid))
+        if node is not None:
+            node["mode"] = 2  # mute the text-to-image chain
+    ui["last_link_id"] = max(int(ui.get("last_link_id", 0)), next_link - 1)
+
+
 def _upload_userdata(base, relpath, data):
     """Store a JSON file under the remote ComfyUI userdata dir (e.g. workflows/)."""
     url = base + "/api/userdata/" + urllib.parse.quote(relpath, safe="") + "?overwrite=true"
@@ -154,7 +283,7 @@ def _upload_userdata(base, relpath, data):
         return r.status
 
 
-def _serve(base, api_workflow, name, seed, prompt_text, faces=None):
+def _serve(base, api_workflow, name, seed, prompt_text, faces=None, image_name=None):
     """Load the prompt-filled UI workflow into ComfyUI; do not run it."""
     ui_path = _ui_workflow_path(api_workflow)
     if not os.path.isfile(ui_path):
@@ -163,6 +292,8 @@ def _serve(base, api_workflow, name, seed, prompt_text, faces=None):
     ui = json.load(open(ui_path, encoding="utf-8"))
     try:
         _apply_ui(ui, prompt_text, name, seed, faces)
+        if image_name:
+            _wire_ui_image(ui, image_name)
     except KeyError as e:
         print(f"[generate_asset] {ui_path} is not a UI workflow (node {e} missing); "
               "pass --workflow pointing at a UI workflow JSON", file=sys.stderr)
@@ -187,8 +318,11 @@ def _serve(base, api_workflow, name, seed, prompt_text, faces=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("prompt", help="text prompt for the 2D image / 3D asset")
-    ap.add_argument("--name", help="asset name (default: slug of prompt + timestamp)")
+    ap.add_argument("prompt", nargs="?", help="text prompt for the 2D image / 3D asset")
+    ap.add_argument("--image", metavar="PATH",
+                    help="input image (PNG/JPG/WebP); skip text-to-image and feed "
+                         "this image to the 3D stage instead (prompt then optional)")
+    ap.add_argument("--name", help="asset name (default: slug of prompt/image + timestamp)")
     ap.add_argument("--outdir", default="assets", help="local output directory")
     ap.add_argument("--host", default=DEFAULT_HOST, help="ComfyUI base URL")
     ap.add_argument("--workflow", default=DEFAULT_API, help="API workflow JSON")
@@ -213,7 +347,20 @@ def main():
 
     base = args.host.rstrip("/")
     seed = args.seed if args.seed is not None else random.randint(1, 2 ** 31 - 1)
-    name = args.name or f"{_slug(args.prompt)}_{int(time.time())}"
+
+    if not args.image and not (args.prompt and args.prompt.strip()):
+        ap.error("a prompt is required unless --image is given")
+    if args.image and not os.path.isfile(args.image):
+        print(f"[generate_asset] input image not found: {args.image}", file=sys.stderr)
+        return 2
+
+    if args.name:
+        name = args.name
+    elif args.image:
+        stem = os.path.splitext(os.path.basename(args.image))[0]
+        name = f"{_slug(stem)}_{int(time.time())}"
+    else:
+        name = f"{_slug(args.prompt)}_{int(time.time())}"
 
     if args.no_style:
         style = ""
@@ -221,24 +368,46 @@ def main():
         style = args.style
     else:
         style = STYLE_PROMPT
-    prompt_text = f"{args.prompt} {style}".strip() if style else args.prompt
+    if args.prompt:
+        prompt_text = f"{args.prompt} {style}".strip() if style else args.prompt
+    else:
+        prompt_text = ""
+    if args.image and args.prompt:
+        print("[generate_asset] --image set: prompt is ignored (image generation skipped)",
+              file=sys.stderr)
 
     if args.serve:
-        return _serve(base, args.workflow, name, seed, prompt_text, args.faces)
+        image_name = None
+        if args.image:
+            try:
+                image_name = _upload(base, args.image)
+            except Exception as e:
+                print(f"[generate_asset] image upload failed: {e}", file=sys.stderr)
+                return 1
+        return _serve(base, args.workflow, name, seed, prompt_text, args.faces, image_name)
 
     os.makedirs(args.outdir, exist_ok=True)
 
     api = json.load(open(args.workflow, encoding="utf-8"))
-    api[NODE_PROMPT]["inputs"]["text"] = prompt_text
+    if args.image:
+        try:
+            image_name = _upload(base, args.image)
+        except Exception as e:
+            print(f"[generate_asset] image upload failed: {e}", file=sys.stderr)
+            return 1
+        _use_input_image(api, image_name)
+    else:
+        api[NODE_PROMPT]["inputs"]["text"] = prompt_text
+        api[NODE_SAVEIMG]["inputs"]["filename_prefix"] = name
     api[NODE_NAME]["inputs"]["value"] = name
-    api[NODE_SAVEIMG]["inputs"]["filename_prefix"] = name
     for nid in (NODE_Z_KS, NODE_GENERATOR, NODE_TEXTURING):
         if "seed" in api.get(nid, {}).get("inputs", {}):
             api[nid]["inputs"]["seed"] = seed
     if args.faces is not None:
         api[NODE_FACE_NUM]["inputs"]["value"] = args.faces
 
-    print(f"[generate_asset] host={base} name={name} seed={seed}")
+    print(f"[generate_asset] host={base} name={name} seed={seed}"
+          + (f" image={args.image}" if args.image else ""))
     try:
         pid = _post(base, api)
     except urllib.error.HTTPError as e:
@@ -256,13 +425,18 @@ def main():
         return 1
 
     outs = entry.get("outputs", {})
-    png = (outs.get(NODE_SAVEIMG, {}).get("images") or [{}])[0].get("filename")
     glb = (outs.get(NODE_PREVIEW3D, {}).get("result") or [None])[0]
 
     local = {}
-    if png:
-        local["2d"] = os.path.join(args.outdir, f"{name}_2d.png")
-        _download(base, png, local["2d"])
+    if args.image:
+        ext = os.path.splitext(args.image)[1].lower() or ".png"
+        local["2d"] = os.path.join(args.outdir, f"{name}_2d{ext}")
+        shutil.copyfile(args.image, local["2d"])
+    else:
+        png = (outs.get(NODE_SAVEIMG, {}).get("images") or [{}])[0].get("filename")
+        if png:
+            local["2d"] = os.path.join(args.outdir, f"{name}_2d.png")
+            _download(base, png, local["2d"])
     if glb:
         local["glb"] = os.path.join(args.outdir, f"{name}.glb")
         _download(base, glb, local["glb"])

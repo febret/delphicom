@@ -1,0 +1,694 @@
+{
+  "id": "a7d3f1c2-8b4e-4d61-9f2a-1c9e6b5a7d43",
+  "revision": 0,
+  "last_node_id": 22,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 4,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -30,
+        290
+      ],
+      "size": [
+        340,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "slot_index": 1,
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "slot_index": 2,
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "models": [
+          {
+            "name": "NoobAI-XL-Vpred-v1.0.safetensors",
+            "url": "https://huggingface.co/Laxhar/noobai-XL-Vpred-1.0/resolve/main/NoobAI-XL-Vpred-v1.0.safetensors",
+            "directory": "checkpoints"
+          }
+        ]
+      },
+      "widgets_values": [
+        "NoobAI-XL-Vpred-v1.0.safetensors"
+      ],
+      "widgets_values_named": {
+        "ckpt_name": "NoobAI-XL-Vpred-v1.0.safetensors"
+      }
+    },
+    {
+      "id": 2,
+      "type": "ModelSamplingDiscrete",
+      "pos": [
+        320,
+        600
+      ],
+      "size": [
+        300,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingDiscrete"
+      },
+      "widgets_values": [
+        "v_prediction",
+        true
+      ],
+      "widgets_values_named": {
+        "sampling": "v_prediction",
+        "zsnr": true
+      }
+    },
+    {
+      "id": 10,
+      "type": "CLIPSetLastLayer",
+      "pos": [
+        -30,
+        480
+      ],
+      "size": [
+        260,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "slot_index": 0,
+          "links": [
+            3,
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPSetLastLayer"
+      },
+      "widgets_values": [
+        -2
+      ],
+      "widgets_values_named": {
+        "stop_at_clip_layer": -2
+      }
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        370,
+        80
+      ],
+      "size": [
+        440,
+        150
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, newest, absurdres, highres, safe, a cozy medieval tavern interior, warm lantern light, detailed"
+      ],
+      "widgets_values_named": {
+        "text": "masterpiece, best quality, newest, absurdres, highres, safe, a cozy medieval tavern interior, warm lantern light, detailed"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        370,
+        270
+      ],
+      "size": [
+        440,
+        150
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro"
+      ],
+      "widgets_values_named": {
+        "text": "nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro"
+      },
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 5,
+      "type": "EmptyLatentImage",
+      "pos": [
+        370,
+        470
+      ],
+      "size": [
+        280,
+        106
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 3,
+      "type": "KSampler",
+      "pos": [
+        860,
+        50
+      ],
+      "size": [
+        320,
+        286
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 15
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 5
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        0,
+        "randomize",
+        28,
+        5.0,
+        "euler",
+        "normal",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 0,
+        "control_after_generate": "randomize",
+        "steps": 28,
+        "cfg": 5.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [
+        1210,
+        70
+      ],
+      "size": [
+        210,
+        60
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 8
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 20,
+      "type": "UpscaleModelLoader",
+      "pos": [
+        1210,
+        220
+      ],
+      "size": [
+        300,
+        58
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "UPSCALE_MODEL",
+          "type": "UPSCALE_MODEL",
+          "slot_index": 0,
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UpscaleModelLoader",
+        "models": [
+          {
+            "name": "4x-UltraSharp.safetensors",
+            "url": "https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.safetensors",
+            "directory": "upscale_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "4x-UltraSharp.safetensors"
+      ],
+      "widgets_values_named": {
+        "model_name": "4x-UltraSharp.safetensors"
+      }
+    },
+    {
+      "id": 21,
+      "type": "ImageUpscaleWithModel",
+      "pos": [
+        1540,
+        220
+      ],
+      "size": [
+        260,
+        78
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "upscale_model",
+          "type": "UPSCALE_MODEL",
+          "link": 13
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageUpscaleWithModel"
+      }
+    },
+    {
+      "id": 22,
+      "type": "ImageScaleBy",
+      "pos": [
+        1820,
+        220
+      ],
+      "size": [
+        240,
+        82
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageScaleBy"
+      },
+      "widgets_values": [
+        "lanczos",
+        1.0
+      ],
+      "widgets_values_named": {
+        "upscale_method": "lanczos",
+        "scale_by": 1.0
+      }
+    },
+    {
+      "id": 9,
+      "type": "SaveImage",
+      "pos": [
+        2080,
+        70
+      ],
+      "size": [
+        320,
+        270
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "images/ComfyUI"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "images/ComfyUI"
+      }
+    },
+    {
+      "id": 18,
+      "type": "MarkdownNote",
+      "pos": [
+        -560,
+        60
+      ],
+      "size": [
+        470,
+        540
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "\n## NoobAI XL V-Pred 1.0 - text to image\n\nSDXL (Illustrious/NoobAI) finetune trained on full Danbooru + e621 tags.\nThis is a **v-prediction (zsnr)** checkpoint and does NOT behave like eps models.\n\n- **V-prediction**: node `ModelSamplingDiscrete` sets `v_prediction` + `zsnr`\n  (recent ComfyUI auto-detects this too). Other samplers can oversaturate.\n- Sampling: **Euler** + `normal` scheduler.\n- CFG **4-5**, steps **28-35**, total area ~1024x1024 (best: 832x1216,\n  1024x1024, 1216x832, 1344x768, ...).\n- **CLIP skip -2**.\n- Prompt template (built into the positive node):\n  `masterpiece, best quality, newest, absurdres, highres, safe, <tags>`.\n  Tag order: `<count>, <character>, <series>, <artists>, <general tags>`.\n- A negative prompt is recommended (see the negative node).\n- Optional 4x upscale: `generate_image.py --upscale` (4x-UltraSharp); the\n  upscale nodes below are bypassed unless enabled.\n\n**models**\n\n- [NoobAI-XL-Vpred-v1.0.safetensors](https://huggingface.co/Laxhar/noobai-XL-Vpred-1.0/resolve/main/NoobAI-XL-Vpred-v1.0.safetensors)\n- [4x-UltraSharp.safetensors](https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.safetensors) (optional upscaler)\n\nModel Storage Location\n\n```\nComfyUI/\n\u2514\u2500\u2500 models/\n    \u251c\u2500\u2500 checkpoints/\n    \u2502      \u2514\u2500\u2500 NoobAI-XL-Vpred-v1.0.safetensors\n    \u2514\u2500\u2500 upscale_models/\n           \u2514\u2500\u2500 4x-UltraSharp.safetensors\n```\n\nDriven by `generate_image.py --workflow noobai_xl_vpred` (see AGENTS.md).\n"
+      ],
+      "widgets_values_named": {
+        "text": "\n## NoobAI XL V-Pred 1.0 - text to image\n\nSDXL (Illustrious/NoobAI) finetune trained on full Danbooru + e621 tags.\nThis is a **v-prediction (zsnr)** checkpoint and does NOT behave like eps models.\n\n- **V-prediction**: node `ModelSamplingDiscrete` sets `v_prediction` + `zsnr`\n  (recent ComfyUI auto-detects this too). Other samplers can oversaturate.\n- Sampling: **Euler** + `normal` scheduler.\n- CFG **4-5**, steps **28-35**, total area ~1024x1024 (best: 832x1216,\n  1024x1024, 1216x832, 1344x768, ...).\n- **CLIP skip -2**.\n- Prompt template (built into the positive node):\n  `masterpiece, best quality, newest, absurdres, highres, safe, <tags>`.\n  Tag order: `<count>, <character>, <series>, <artists>, <general tags>`.\n- A negative prompt is recommended (see the negative node).\n- Optional 4x upscale: `generate_image.py --upscale` (4x-UltraSharp); the\n  upscale nodes below are bypassed unless enabled.\n\n**models**\n\n- [NoobAI-XL-Vpred-v1.0.safetensors](https://huggingface.co/Laxhar/noobai-XL-Vpred-1.0/resolve/main/NoobAI-XL-Vpred-v1.0.safetensors)\n- [4x-UltraSharp.safetensors](https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.safetensors) (optional upscaler)\n\nModel Storage Location\n\n```\nComfyUI/\n\u2514\u2500\u2500 models/\n    \u251c\u2500\u2500 checkpoints/\n    \u2502      \u2514\u2500\u2500 NoobAI-XL-Vpred-v1.0.safetensors\n    \u2514\u2500\u2500 upscale_models/\n           \u2514\u2500\u2500 4x-UltraSharp.safetensors\n```\n\nDriven by `generate_image.py --workflow noobai_xl_vpred` (see AGENTS.md).\n"
+      },
+      "color": "#222",
+      "bgcolor": "#000"
+    }
+  ],
+  "links": [
+    [
+      1,
+      4,
+      0,
+      2,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      4,
+      1,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      10,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      10,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      5,
+      6,
+      0,
+      3,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      7,
+      0,
+      3,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      5,
+      0,
+      3,
+      3,
+      "LATENT"
+    ],
+    [
+      8,
+      3,
+      0,
+      8,
+      0,
+      "LATENT"
+    ],
+    [
+      9,
+      4,
+      2,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      11,
+      21,
+      0,
+      22,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      22,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      20,
+      0,
+      21,
+      0,
+      "UPSCALE_MODEL"
+    ],
+    [
+      14,
+      8,
+      0,
+      21,
+      1,
+      "IMAGE"
+    ],
+    [
+      15,
+      2,
+      0,
+      3,
+      0,
+      "MODEL"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "frontendVersion": "1.51.9"
+  },
+  "version": 0.4
+}

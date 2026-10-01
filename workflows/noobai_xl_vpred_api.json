@@ -1,0 +1,173 @@
+{
+ "4": {
+  "class_type": "CheckpointLoaderSimple",
+  "inputs": {
+   "ckpt_name": "NoobAI-XL-Vpred-v1.0.safetensors"
+  },
+  "_meta": {
+   "title": "Load Checkpoint (NoobAI XL V-Pred 1.0)"
+  }
+ },
+ "2": {
+  "class_type": "ModelSamplingDiscrete",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "sampling": "v_prediction",
+   "zsnr": true
+  },
+  "_meta": {
+   "title": "V-Prediction (zsnr)"
+  }
+ },
+ "10": {
+  "class_type": "CLIPSetLastLayer",
+  "inputs": {
+   "clip": [
+    "4",
+    1
+   ],
+   "stop_at_clip_layer": -2
+  },
+  "_meta": {
+   "title": "CLIP Skip (-2)"
+  }
+ },
+ "6": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "masterpiece, best quality, newest, absurdres, highres, safe, a cozy medieval tavern interior, warm lantern light, detailed",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Prompt"
+  }
+ },
+ "7": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro",
+   "clip": [
+    "10",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Negative Prompt"
+  }
+ },
+ "5": {
+  "class_type": "EmptyLatentImage",
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "Resolution"
+  }
+ },
+ "3": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "seed": 0,
+   "steps": 28,
+   "cfg": 5.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "positive": [
+    "6",
+    0
+   ],
+   "negative": [
+    "7",
+    0
+   ],
+   "latent_image": [
+    "5",
+    0
+   ],
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "8": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "3",
+    0
+   ],
+   "vae": [
+    "4",
+    2
+   ]
+  },
+  "_meta": {
+   "title": "VAEDecode"
+  }
+ },
+ "20": {
+  "class_type": "UpscaleModelLoader",
+  "inputs": {
+   "model_name": "4x-UltraSharp.safetensors"
+  },
+  "_meta": {
+   "title": "Load Upscale Model (4x-UltraSharp)"
+  }
+ },
+ "21": {
+  "class_type": "ImageUpscaleWithModel",
+  "inputs": {
+   "upscale_model": [
+    "20",
+    0
+   ],
+   "image": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Upscale Image"
+  }
+ },
+ "22": {
+  "class_type": "ImageScaleBy",
+  "inputs": {
+   "image": [
+    "21",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "scale_by": 1.0
+  },
+  "_meta": {
+   "title": "Resize (optional)"
+  }
+ },
+ "9": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "8",
+    0
+   ],
+   "filename_prefix": "images/ComfyUI"
+  },
+  "_meta": {
+   "title": "Save Image"
+  }
+ }
+}
